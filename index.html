@@ -1,0 +1,2884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Euclid-5 // 5-Voice Euclidean Drum Sequencer</title>
+  <style>
+    /* CSS Reset & Variables */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-base: #0e1013;
+      --bg-surface: #141720;
+      --bg-surface-elevated: #1a1e2a;
+      --bg-surface-hover: #222736;
+      --border-subtle: #22262e;
+      --border-bright: #343c4d;
+
+      --text-main: #f1f5f9;
+      --text-muted: #8b95ad;
+      --text-dim: #545e78;
+
+      /* 5-Voice Synthesizer Neon Accents */
+      --color-kick: #ff4757;
+      --color-kick-glow: rgba(255, 71, 87, 0.45);
+      --color-snare: #ffa502;
+      --color-snare-glow: rgba(255, 165, 2, 0.45);
+      --color-ch: #1e90ff;
+      --color-ch-glow: rgba(30, 144, 255, 0.45);
+      --color-oh: #a55eea;
+      --color-oh-glow: rgba(165, 94, 234, 0.45);
+      --color-rim: #2ed573;
+      --color-rim-glow: rgba(46, 213, 115, 0.45);
+
+      --accent-green: #2ed573;
+      --accent-red: #ff4757;
+      --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Web Audio Unlock Notification Banner */
+    #unlockBanner {
+      display: none;
+      background: linear-gradient(90deg, #ff4757, #a55eea);
+      color: #ffffff;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(255, 71, 87, 0.35);
+      z-index: 100;
+      animation: pulseBanner 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseBanner {
+      0%, 100% { opacity: 0.92; }
+      50% { opacity: 1; }
+    }
+
+    /* Top Master Navigation & Transport */
+    header {
+      background: linear-gradient(180deg, #171b26 0%, #10131b 100%);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 20;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: radial-gradient(circle at center, #252c3e, #131722);
+      border: 1px solid var(--border-bright);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(30, 144, 255, 0.2);
+    }
+
+    .logo-badge svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .brand-titles h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-titles .subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--color-ch);
+      letter-spacing: 0.06em;
+    }
+
+    /* Master Transport Controls */
+    .master-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn-play {
+      background: linear-gradient(135deg, #2ed573 0%, #10b981 100%);
+      color: #042113;
+      border: 1px solid #55e68b;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 0.88rem;
+      padding: 8px 22px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 16px rgba(46, 213, 115, 0.35);
+    }
+
+    .btn-play:hover {
+      box-shadow: 0 0 24px rgba(46, 213, 115, 0.55);
+      transform: translateY(-1px);
+    }
+
+    .btn-play.playing {
+      background: linear-gradient(135deg, #ff4757 0%, #c0392b 100%);
+      border-color: #ff6b81;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(255, 71, 87, 0.45);
+    }
+
+    .btn-subtle {
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      padding: 7px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-subtle:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-bright);
+    }
+
+    .btn-tap {
+      background: #1b212f;
+      color: var(--color-ch);
+      border: 1px solid rgba(30, 144, 255, 0.4);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.74rem;
+      padding: 7px 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .btn-tap:active {
+      transform: scale(0.95);
+      background: var(--color-ch);
+      color: #fff;
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .control-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-label span.val {
+      color: var(--text-main);
+      font-weight: bold;
+    }
+
+    .slider-compact {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: #252b3b;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider-compact::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #f0f3fa;
+      border: 2px solid var(--color-ch);
+      box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .slider-compact::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Preset Select Dropdown */
+    .preset-selector {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--color-ch);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 5px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .preset-selector:hover, .preset-selector:focus {
+      border-color: var(--color-ch);
+    }
+
+    .preset-selector optgroup {
+      background: #141822;
+      color: #94a3b8;
+      font-weight: 700;
+      font-size: 0.72rem;
+      padding: 4px;
+    }
+
+    .preset-selector option {
+      background: #191e2b;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+
+    /* Global Telemetry HUD Strip */
+    .telemetry-strip {
+      background: #0b0d11;
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+    }
+
+    .hud-metrics {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hud-metric-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .hud-metric-pill .tag {
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+    }
+
+    .hud-metric-pill .num {
+      color: var(--color-ch);
+      font-weight: 700;
+    }
+
+    .hud-metric-pill .num.highlight-amber {
+      color: var(--color-snare);
+    }
+
+    .hud-metric-pill .num.highlight-pink {
+      color: var(--color-kick);
+    }
+
+    .hud-metric-pill .num.highlight-green {
+      color: var(--color-rim);
+    }
+
+    .sync-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      max-width: 320px;
+      min-width: 180px;
+    }
+
+    .progress-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #191e2b;
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #1e90ff, #a55eea);
+      transition: width 0.05s linear;
+      box-shadow: 0 0 10px rgba(30, 144, 255, 0.5);
+    }
+
+    /* Main Dashboard Layout */
+    main {
+      flex: 1;
+      padding: 16px 24px;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 20px;
+      max-width: 1780px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1240px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Column: Concentric Polar Display */
+    .visualizer-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-ch);
+      box-shadow: 0 0 8px var(--color-ch);
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 410px;
+      height: 410px;
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #polarCanvas {
+      width: 410px;
+      height: 410px;
+      border-radius: 50%;
+      cursor: crosshair;
+      background: radial-gradient(circle at center, #171b26 0%, #0f121a 70%, #080a0f 100%);
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.7);
+    }
+
+    .polar-legend {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+    }
+
+    .legend-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 3px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .legend-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .legend-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Right Column: 5 Track Sequencer Strips */
+    .sequencer-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Individual Voice Channel Strip */
+    .voice-strip {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+
+    .voice-strip:hover {
+      border-color: var(--border-bright);
+    }
+
+    .voice-strip.active-voice-0 { border-left: 4px solid var(--color-kick); }
+    .voice-strip.active-voice-1 { border-left: 4px solid var(--color-snare); }
+    .voice-strip.active-voice-2 { border-left: 4px solid var(--color-ch); }
+    .voice-strip.active-voice-3 { border-left: 4px solid var(--color-oh); }
+    .voice-strip.active-voice-4 { border-left: 4px solid var(--color-rim); }
+
+    .voice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .voice-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .voice-trigger-btn {
+      background: #232838;
+      border: 1px solid var(--border-bright);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.76rem;
+      padding: 4px 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.1s ease;
+    }
+
+    .voice-trigger-btn:active {
+      transform: scale(0.95);
+    }
+
+    .voice-led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2d3748;
+      transition: background 0.05s, box-shadow 0.05s;
+    }
+
+    .voice-strip[data-voice="0"] .voice-led.active { background: var(--color-kick); box-shadow: 0 0 10px var(--color-kick); }
+    .voice-strip[data-voice="1"] .voice-led.active { background: var(--color-snare); box-shadow: 0 0 10px var(--color-snare); }
+    .voice-strip[data-voice="2"] .voice-led.active { background: var(--color-ch); box-shadow: 0 0 10px var(--color-ch); }
+    .voice-strip[data-voice="3"] .voice-led.active { background: var(--color-oh); box-shadow: 0 0 10px var(--color-oh); }
+    .voice-strip[data-voice="4"] .voice-led.active { background: var(--color-rim); box-shadow: 0 0 10px var(--color-rim); }
+
+    .voice-formula-pill {
+      font-family: var(--font-mono);
+      font-size: 0.70rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+      color: #94a3b8;
+    }
+
+    .voice-formula-pill.customized {
+      color: var(--color-snare);
+      border-color: rgba(255, 165, 2, 0.4);
+    }
+
+    .choke-badge {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      background: rgba(165, 94, 234, 0.15);
+      border: 1px solid rgba(165, 94, 234, 0.4);
+      color: var(--color-oh);
+      padding: 2px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+    }
+
+    .voice-strip-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-toggle-round {
+      width: 25px;
+      height: 25px;
+      border-radius: 4px;
+      background: #1d2230;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.70rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-toggle-round:hover {
+      background: #272f42;
+      color: #fff;
+    }
+
+    .btn-toggle-round.active-mute {
+      background: rgba(255, 71, 87, 0.25);
+      border-color: #ff4757;
+      color: #ff4757;
+      box-shadow: 0 0 8px rgba(255, 71, 87, 0.4);
+    }
+
+    .btn-toggle-round.active-solo {
+      background: rgba(255, 165, 2, 0.25);
+      border-color: #ffa502;
+      color: #ffa502;
+      box-shadow: 0 0 8px rgba(255, 165, 2, 0.4);
+    }
+
+    /* Voice Parameters Sliders */
+    .voice-params-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.22);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    .param-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .param-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.63rem;
+      color: var(--text-muted);
+    }
+
+    .param-label-row .p-val {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .param-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: #252b3d;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .voice-strip[data-voice="0"] .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-kick);
+      box-shadow: 0 0 6px var(--color-kick);
+      cursor: pointer;
+    }
+
+    .voice-strip[data-voice="1"] .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-snare);
+      box-shadow: 0 0 6px var(--color-snare);
+      cursor: pointer;
+    }
+
+    .voice-strip[data-voice="2"] .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-ch);
+      box-shadow: 0 0 6px var(--color-ch);
+      cursor: pointer;
+    }
+
+    .voice-strip[data-voice="3"] .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-oh);
+      box-shadow: 0 0 6px var(--color-oh);
+      cursor: pointer;
+    }
+
+    .voice-strip[data-voice="4"] .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--color-rim);
+      box-shadow: 0 0 6px var(--color-rim);
+      cursor: pointer;
+    }
+
+    /* Linear Step Grid */
+    .step-grid-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .step-grid-row {
+      display: flex;
+      gap: 4px;
+      min-width: min-content;
+    }
+
+    .step-btn {
+      width: 25px;
+      height: 36px;
+      border-radius: 4px;
+      background: #171b28;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 0.60rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 0 2px 0;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.1s, border-color 0.1s, transform 0.05s;
+    }
+
+    .step-btn:hover {
+      background: #22293d;
+      border-color: var(--border-bright);
+    }
+
+    /* Beat grouping divider */
+    .step-btn.beat-start {
+      border-left: 2px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .step-btn .step-num {
+      font-size: 0.56rem;
+      opacity: 0.6;
+    }
+
+    .step-btn .step-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #2b3347;
+      transition: all 0.1s;
+    }
+
+    /* Active Hit states */
+    .voice-strip[data-voice="0"] .step-btn.hit {
+      background: rgba(255, 71, 87, 0.22);
+      border-color: var(--color-kick);
+      color: #fff;
+    }
+    .voice-strip[data-voice="0"] .step-btn.hit .step-pip {
+      background: var(--color-kick);
+      box-shadow: 0 0 8px var(--color-kick);
+    }
+
+    .voice-strip[data-voice="1"] .step-btn.hit {
+      background: rgba(255, 165, 2, 0.22);
+      border-color: var(--color-snare);
+      color: #fff;
+    }
+    .voice-strip[data-voice="1"] .step-btn.hit .step-pip {
+      background: var(--color-snare);
+      box-shadow: 0 0 8px var(--color-snare);
+    }
+
+    .voice-strip[data-voice="2"] .step-btn.hit {
+      background: rgba(30, 144, 255, 0.22);
+      border-color: var(--color-ch);
+      color: #fff;
+    }
+    .voice-strip[data-voice="2"] .step-btn.hit .step-pip {
+      background: var(--color-ch);
+      box-shadow: 0 0 8px var(--color-ch);
+    }
+
+    .voice-strip[data-voice="3"] .step-btn.hit {
+      background: rgba(165, 94, 234, 0.22);
+      border-color: var(--color-oh);
+      color: #fff;
+    }
+    .voice-strip[data-voice="3"] .step-btn.hit .step-pip {
+      background: var(--color-oh);
+      box-shadow: 0 0 8px var(--color-oh);
+    }
+
+    .voice-strip[data-voice="4"] .step-btn.hit {
+      background: rgba(46, 213, 115, 0.22);
+      border-color: var(--color-rim);
+      color: #fff;
+    }
+    .voice-strip[data-voice="4"] .step-btn.hit .step-pip {
+      background: var(--color-rim);
+      box-shadow: 0 0 8px var(--color-rim);
+    }
+
+    /* Real-Time Runner Playhead Step Highlight */
+    .step-btn.current-step {
+      border: 1px solid #ffffff !important;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+      transform: translateY(-2px);
+      z-index: 2;
+    }
+
+    .step-btn.current-step::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 6px #ffffff;
+    }
+
+    /* Utilities Row per Track */
+    .voice-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+    }
+
+    .btn-tiny-action {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      border-radius: 3px;
+      padding: 2px 7px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      transition: all 0.1s;
+    }
+
+    .btn-tiny-action:hover {
+      border-color: var(--border-bright);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-surface);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-bright);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4a5568;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Web Audio Unlock Prompt -->
+  <div id="unlockBanner">
+    <span>🔊 AUDIO ENGINE STANDBY — CLICK ANYWHERE OR PRESS SPACE TO START WEB AUDIO</span>
+  </div>
+
+  <!-- Header & Master Transport Controls -->
+  <header>
+    <div class="brand-group">
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#1e90ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="12 6 12 12 16 14"></polygon>
+        </svg>
+      </div>
+      <div class="brand-titles">
+        <h1>EUCLID-5</h1>
+        <div class="subtitle">5-VOICE POLYMETRIC SEQUENCER // CHOKE GROUP</div>
+      </div>
+    </div>
+
+    <!-- Transport Toolbar -->
+    <div class="master-controls">
+      <button id="btnPlay" class="btn-play">
+        <span id="playIcon">▶</span>
+        <span id="playText">PLAY</span>
+      </button>
+
+      <button id="btnReset" class="btn-subtle" title="Reset playhead to step 0">
+        <span>⏮ RESET</span>
+      </button>
+
+      <!-- BPM Slider & Tap Button -->
+      <div class="control-item" style="min-width: 140px;">
+        <div class="control-label">
+          <span>TEMPO</span>
+          <span class="val" id="bpmVal">124 BPM</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="range" id="bpmSlider" class="slider-compact" min="60" max="200" value="124" step="1" style="flex: 1;">
+          <button id="btnTap" class="btn-tap" title="Tap repeatedly to set tempo">TAP</button>
+        </div>
+      </div>
+
+      <!-- Swing / Shuffle Slider -->
+      <div class="control-item" style="min-width: 135px;">
+        <div class="control-label">
+          <span>SWING</span>
+          <span class="val" id="swingVal">54% (Groove)</span>
+        </div>
+        <input type="range" id="swingSlider" class="slider-compact" min="50" max="70" value="54" step="1">
+      </div>
+
+      <!-- Master Volume Slider -->
+      <div class="control-item" style="min-width: 95px;">
+        <div class="control-label">
+          <span>MASTER</span>
+          <span class="val" id="masterVolVal">85%</span>
+        </div>
+        <input type="range" id="masterVolSlider" class="slider-compact" min="0" max="100" value="85" step="1">
+      </div>
+
+      <!-- Presets Selector -->
+      <div class="control-item">
+        <div class="control-label">
+          <span>PRESET</span>
+        </div>
+        <select id="presetSelect" class="preset-selector">
+          <optgroup label="Classical &amp; Ethnomusicology">
+            <option value="afro-cuban">Afro-Cuban Son Clave &amp; Shimmer</option>
+            <option value="bossa-samba">Brazilian Bossa Nova &amp; Samba</option>
+            <option value="west-african">West African 12/8 (Gahu Bell)</option>
+            <option value="kalamatianos">Kalamatianos (Balkan 7/8 Additive)</option>
+            <option value="balkan-13-8">Balkan / Macedonian 13/8</option>
+          </optgroup>
+          <optgroup label="Electronic &amp; Modern">
+            <option value="classic-house" selected>Classic House &amp; Offbeat Lift</option>
+            <option value="minimal-techno">Minimal Techno Pocket</option>
+            <option value="uk-garage">UK Garage / 2-Step Choke</option>
+            <option value="dnb-breakbeat">Drum &amp; Bass Breakbeat</option>
+            <option value="trap-halftime">Trap Half-Time Pocket</option>
+          </optgroup>
+          <optgroup label="Polymetric &amp; Experimental">
+            <option value="generative-poly">Generative Polymetric Phasing (LCM Macro)</option>
+            <option value="blank">Clear / Blank</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Telemetry HUD -->
+  <div class="telemetry-strip">
+    <div class="hud-metrics">
+      <div class="hud-metric-pill" title="Total system steps before all 5 voices resynchronize (LCM)">
+        <span class="tag">CYCLE LCM:</span>
+        <span class="num highlight-amber" id="lcmStepsVal">16 STEPS</span>
+      </div>
+      <div class="hud-metric-pill" title="Equivalent 4/4 measures (16 sixteenth notes per measure)">
+        <span class="tag">MEASURES:</span>
+        <span class="num" id="lcmMeasuresVal">1.0 BARS</span>
+      </div>
+      <div class="hud-metric-pill" title="Real-world duration of one complete LCM cycle">
+        <span class="tag">CYCLE TIME:</span>
+        <span class="num" id="lcmTimeVal">00:02.00</span>
+      </div>
+      <div class="hud-metric-pill" title="Current 16th-note clock tick">
+        <span class="tag">GLOBAL TICK:</span>
+        <span class="num highlight-pink" id="globalTickVal">0000</span>
+      </div>
+      <div class="hud-metric-pill" title="Hardware Choke Group status">
+        <span class="tag">CHOKE GROUP:</span>
+        <span class="num highlight-green" id="chokeStatusVal">CH &amp; OH LINKED</span>
+      </div>
+    </div>
+
+    <!-- Cycle Resynchronization Phase Progress Bar -->
+    <div class="sync-progress-wrap" title="Phase towards full LCM resynchronization">
+      <span class="tag" style="color: var(--text-dim); font-size: 0.65rem;">RESYNC:</span>
+      <div class="progress-bar-bg">
+        <div id="syncProgressBar" class="progress-bar-fill"></div>
+      </div>
+      <span id="syncPercentVal" style="color: var(--color-ch); font-size: 0.7rem; font-weight: 700; width: 34px;">0%</span>
+    </div>
+  </div>
+
+  <!-- Main Content Dashboard -->
+  <main>
+    <!-- Left Column: Polar Canvas Visualizer (5 Concentric Rings) -->
+    <section class="visualizer-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="card-title-icon"></span>
+          <span>5-VOICE CONCENTRIC POLAR DISPLAY</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="btnTogglePolygons" class="btn-subtle" style="padding: 2px 7px; font-size: 0.65rem;" title="Toggle geometric polygon overlay">POLYGONS: ON</button>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="polarCanvas" width="840" height="840"></canvas>
+      </div>
+
+      <!-- 5-Voice Polar Legend (From inside Kick to outside OH) -->
+      <div class="polar-legend">
+        <div class="legend-item" id="legendKick" data-voice="0">
+          <div class="legend-indicator" style="background: var(--color-kick); box-shadow: 0 0 8px var(--color-kick);"></div>
+          <span style="color: var(--color-kick); font-weight: bold;">R1: KICK</span>
+          <span id="legendKickFormula" style="color: var(--text-muted);">E(4,16)</span>
+        </div>
+        <div class="legend-item" id="legendSnare" data-voice="1">
+          <div class="legend-indicator" style="background: var(--color-snare); box-shadow: 0 0 8px var(--color-snare);"></div>
+          <span style="color: var(--color-snare); font-weight: bold;">R2: SNARE</span>
+          <span id="legendSnareFormula" style="color: var(--text-muted);">E(2,16)</span>
+        </div>
+        <div class="legend-item" id="legendRim" data-voice="4">
+          <div class="legend-indicator" style="background: var(--color-rim); box-shadow: 0 0 8px var(--color-rim);"></div>
+          <span style="color: var(--color-rim); font-weight: bold;">R3: RIM</span>
+          <span id="legendRimFormula" style="color: var(--text-muted);">E(3,16)</span>
+        </div>
+        <div class="legend-item" id="legendCH" data-voice="2">
+          <div class="legend-indicator" style="background: var(--color-ch); box-shadow: 0 0 8px var(--color-ch);"></div>
+          <span style="color: var(--color-ch); font-weight: bold;">R4: CH</span>
+          <span id="legendCHFormula" style="color: var(--text-muted);">E(8,16)</span>
+        </div>
+        <div class="legend-item" id="legendOH" data-voice="3">
+          <div class="legend-indicator" style="background: var(--color-oh); box-shadow: 0 0 8px var(--color-oh);"></div>
+          <span style="color: var(--color-oh); font-weight: bold;">R5: OH</span>
+          <span id="legendOHFormula" style="color: var(--text-muted);">E(4,16)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: 5 Track Sequencer Strips -->
+    <section class="sequencer-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="card-title-icon" style="background: var(--color-kick); box-shadow: 0 0 8px var(--color-kick);"></span>
+          <span>5-VOICE POLYMETRIC SEQUENCER MATRIX</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted);">
+          <span>CLICK ANY STEP TO OVERRIDE // BJORKLUND RECURSIVE CORE</span>
+        </div>
+      </div>
+
+      <!-- Container holding the 5 voice strips -->
+      <div id="voiceStripsContainer" style="display: flex; flex-direction: column; gap: 10px;">
+        <!-- Injected dynamically via JavaScript -->
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /**
+     * EUCLID-5 // 5-VOICE EUCLIDEAN DRUM SEQUENCER
+     * Architecture: Native Web Audio API + Bjorklund's Recursive Algorithm + Hi-Hat Choke Group
+     */
+
+    // --- 1. BJORKLUND'S RECURSIVE ALGORITHM ---
+    function bjorklund(k, n) {
+      if (n <= 0) return [];
+      if (k <= 0) return new Array(n).fill(0);
+      if (k >= n) return new Array(n).fill(1);
+
+      let heads = Array.from({ length: k }, () => [1]);
+      let remainders = Array.from({ length: n - k }, () => [0]);
+
+      while (remainders.length > 1) {
+        const minLen = Math.min(heads.length, remainders.length);
+        const newHeads = [];
+        for (let i = 0; i < minLen; i++) {
+          newHeads.push(heads[i].concat(remainders[i]));
+        }
+        if (heads.length > minLen) {
+          remainders = heads.slice(minLen);
+          heads = newHeads;
+        } else {
+          remainders = remainders.slice(minLen);
+          heads = newHeads;
+        }
+      }
+
+      const result = [];
+      for (const h of heads) result.push(...h);
+      for (const r of remainders) result.push(...r);
+      return result;
+    }
+
+    // Circular rotation (positive r shifts pattern right / clockwise)
+    function rotateArray(arr, r) {
+      if (arr.length === 0) return [];
+      const offset = ((r % arr.length) + arr.length) % arr.length;
+      if (offset === 0) return [...arr];
+      return arr.slice(-offset).concat(arr.slice(0, -offset));
+    }
+
+    function getEuclideanPattern(k, n, rotation) {
+      const base = bjorklund(k, n);
+      return rotateArray(base, rotation);
+    }
+
+    // Mathematical GCD and LCM
+    function gcd(a, b) {
+      while (b) {
+        const t = b;
+        b = a % b;
+        a = t;
+      }
+      return a;
+    }
+
+    function lcm(a, b) {
+      if (a === 0 || b === 0) return 0;
+      return Math.abs((a * b) / gcd(a, b));
+    }
+
+    function getMasterLCM(stepCounts) {
+      return stepCounts.reduce((acc, val) => lcm(acc, val), 1);
+    }
+
+    // --- 2. PRESETS CONFIGURATIONS (5 VOICES: Kick, Snare, CH, OH, Rim) ---
+    const PRESETS = {
+      // 1. Classic House & Offbeat Lift
+      'classic-house': {
+        name: "Classic House & Offbeat Lift",
+        bpm: 124,
+        swing: 54,
+        voices: [
+          { steps: 16, hits: 4, rotation: 0, vol: 0.95 }, // Kick E(4, 16, 0)
+          { steps: 16, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 16, 4)
+          { steps: 16, hits: 8, rotation: 0, vol: 0.75 }, // CH E(8, 16, 0)
+          { steps: 16, hits: 4, rotation: 2, vol: 0.85, decay: 0.35 }, // OH E(4, 16, 2)
+          { steps: 16, hits: 3, rotation: 6, vol: 0.80 }  // Rim E(3, 16, 6)
+        ]
+      },
+
+      // 2. Brazilian Bossa Nova & Samba
+      'bossa-samba': {
+        name: "Brazilian Bossa Nova & Samba",
+        bpm: 125,
+        swing: 52,
+        voices: [
+          { steps: 16, hits: 4, rotation: 0, vol: 0.95 },  // Kick E(4, 16, 0)
+          { steps: 16, hits: 5, rotation: 0, vol: 0.85 },  // Snare E(5, 16, 0)
+          { steps: 16, hits: 16, rotation: 0, vol: 0.65 }, // CH E(16, 16, 0)
+          { steps: 16, hits: 2, rotation: 14, vol: 0.85, decay: 0.25 }, // OH E(2, 16, 14)
+          { steps: 16, hits: 7, rotation: 4, vol: 0.85 }   // Rim E(7, 16, 4)
+        ]
+      },
+
+      // 3. Afro-Cuban Son Clave & Shimmer
+      'afro-cuban': {
+        name: "Afro-Cuban Son Clave & Shimmer",
+        bpm: 112,
+        swing: 50,
+        voices: [
+          { steps: 16, hits: 4, rotation: 0, vol: 0.95 }, // Kick E(4, 16, 0)
+          { steps: 16, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 16, 4)
+          { steps: 16, hits: 11, rotation: 0, vol: 0.70 }, // CH E(11, 16, 0)
+          { steps: 16, hits: 3, rotation: 2, vol: 0.85, decay: 0.30 }, // OH E(3, 16, 2)
+          { steps: 16, hits: 5, rotation: 0, vol: 0.85 }  // Rim E(5, 16, 0)
+        ]
+      },
+
+      // 4. West African 12/8 (Gahu Bell)
+      'west-african': {
+        name: "West African 12/8 (Gahu Bell)",
+        bpm: 115,
+        swing: 50,
+        voices: [
+          { steps: 12, hits: 4, rotation: 0, vol: 0.95 }, // Kick E(4, 12, 0)
+          { steps: 12, hits: 2, rotation: 6, vol: 0.85 }, // Snare E(2, 12, 6)
+          { steps: 12, hits: 6, rotation: 0, vol: 0.75 }, // CH E(6, 12, 0)
+          { steps: 12, hits: 3, rotation: 2, vol: 0.85, decay: 0.28 }, // OH E(3, 12, 2)
+          { steps: 12, hits: 7, rotation: 2, vol: 0.85 }  // Rim E(7, 12, 2)
+        ]
+      },
+
+      // 5. Kalamatianos (Balkan 7/8 Additive)
+      'kalamatianos': {
+        name: "Kalamatianos (Balkan 7/8 Additive)",
+        bpm: 130,
+        swing: 50,
+        voices: [
+          { steps: 7, hits: 3, rotation: 0, vol: 0.95 }, // Kick E(3, 7, 0)
+          { steps: 7, hits: 1, rotation: 3, vol: 0.85 }, // Snare E(1, 7, 3)
+          { steps: 7, hits: 7, rotation: 0, vol: 0.70 }, // CH E(7, 7, 0)
+          { steps: 7, hits: 1, rotation: 2, vol: 0.85, decay: 0.25 }, // OH E(1, 7, 2)
+          { steps: 7, hits: 2, rotation: 1, vol: 0.85 }  // Rim E(2, 7, 1)
+        ]
+      },
+
+      // 6. Balkan / Macedonian 13/8
+      'balkan-13-8': {
+        name: "Balkan / Macedonian 13/8",
+        bpm: 136,
+        swing: 50,
+        voices: [
+          { steps: 13, hits: 5, rotation: 0, vol: 0.95 }, // Kick E(5, 13, 0)
+          { steps: 13, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 13, 4)
+          { steps: 13, hits: 7, rotation: 1, vol: 0.75 }, // CH E(7, 13, 1)
+          { steps: 13, hits: 2, rotation: 7, vol: 0.85, decay: 0.28 }, // OH E(2, 13, 7)
+          { steps: 13, hits: 3, rotation: 2, vol: 0.80 }  // Rim E(3, 13, 2)
+        ]
+      },
+
+      // 7. UK Garage / 2-Step Choke
+      'uk-garage': {
+        name: "UK Garage / 2-Step Choke",
+        bpm: 132,
+        swing: 58,
+        voices: [
+          { steps: 16, hits: 2, rotation: 0, vol: 0.95 }, // Kick E(2, 16, 0)
+          { steps: 16, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 16, 4)
+          { steps: 16, hits: 10, rotation: 1, vol: 0.75 }, // CH E(10, 16, 1)
+          { steps: 16, hits: 2, rotation: 7, vol: 0.85, decay: 0.40 }, // OH E(2, 16, 7)
+          { steps: 16, hits: 3, rotation: 6, vol: 0.80 }  // Rim E(3, 16, 6)
+        ]
+      },
+
+      // 8. Drum & Bass Breakbeat
+      'dnb-breakbeat': {
+        name: "Drum & Bass Breakbeat",
+        bpm: 174,
+        swing: 50,
+        voices: [
+          { steps: 16, hits: 3, rotation: 0, vol: 0.95 }, // Kick E(3, 16, 0)
+          { steps: 16, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 16, 4)
+          { steps: 16, hits: 12, rotation: 0, vol: 0.70 }, // CH E(12, 16, 0)
+          { steps: 16, hits: 2, rotation: 10, vol: 0.85, decay: 0.25 }, // OH E(2, 16, 10)
+          { steps: 16, hits: 5, rotation: 2, vol: 0.85 }  // Rim E(5, 16, 2)
+        ]
+      },
+
+      // 9. Trap Half-Time Pocket
+      'trap-halftime': {
+        name: "Trap Half-Time Pocket",
+        bpm: 140,
+        swing: 50,
+        voices: [
+          { steps: 16, hits: 5, rotation: 0, vol: 0.95 }, // Kick E(5, 16, 0)
+          { steps: 16, hits: 1, rotation: 8, vol: 0.90 }, // Snare E(1, 16, 8)
+          { steps: 16, hits: 13, rotation: 0, vol: 0.70 }, // CH E(13, 16, 0)
+          { steps: 16, hits: 2, rotation: 14, vol: 0.85, decay: 0.45 }, // OH E(2, 16, 14)
+          { steps: 16, hits: 3, rotation: 3, vol: 0.80 }  // Rim E(3, 16, 3)
+        ]
+      },
+
+      // 10. Minimal Techno Pocket
+      'minimal-techno': {
+        name: "Minimal Techno Pocket",
+        bpm: 126,
+        swing: 58,
+        voices: [
+          { steps: 16, hits: 4, rotation: 0, vol: 0.95 }, // Kick E(4, 16, 0)
+          { steps: 16, hits: 1, rotation: 8, vol: 0.85 }, // Snare E(1, 16, 8)
+          { steps: 16, hits: 11, rotation: 0, vol: 0.70 }, // CH E(11, 16, 0)
+          { steps: 16, hits: 4, rotation: 2, vol: 0.85, decay: 0.35 }, // OH E(4, 16, 2)
+          { steps: 8,  hits: 3, rotation: 2, vol: 0.80 }  // Rim E(3, 8, 2)
+        ]
+      },
+
+      // 11. Generative Polymetric Phasing (LCM Macro)
+      'generative-poly': {
+        name: "Generative Polymetric Phasing (LCM Macro)",
+        bpm: 120,
+        swing: 50,
+        voices: [
+          { steps: 16, hits: 4, rotation: 0, vol: 0.90 }, // Kick E(4, 16, 0)
+          { steps: 15, hits: 2, rotation: 4, vol: 0.85 }, // Snare E(2, 15, 4)
+          { steps: 14, hits: 9, rotation: 0, vol: 0.75 }, // CH E(9, 14, 0)
+          { steps: 7,  hits: 3, rotation: 1, vol: 0.85, decay: 0.35 }, // OH E(3, 7, 1)
+          { steps: 11, hits: 5, rotation: 2, vol: 0.80 }  // Rim E(5, 11, 2)
+        ]
+      },
+
+      // 12. Clear / Blank
+      'blank': {
+        name: "Clear / Blank",
+        bpm: 120,
+        swing: 50,
+        voices: [
+          { steps: 16, hits: 0, rotation: 0, vol: 0.95 },
+          { steps: 16, hits: 0, rotation: 0, vol: 0.85 },
+          { steps: 16, hits: 0, rotation: 0, vol: 0.75 },
+          { steps: 16, hits: 0, rotation: 0, vol: 0.85, decay: 0.35 },
+          { steps: 16, hits: 0, rotation: 0, vol: 0.80 }
+        ]
+      }
+    };
+
+    // --- 3. TRACK CONFIGURATION (5 VOICES) ---
+    // Note: Voices are arranged in order of musical strips: Kick, Snare, CH, OH, Rim.
+    // In polar concentric rings (inside-out by frequency): Kick (R1), Snare (R2), Rim (R3), CH (R4), OH (R5).
+    const VOICES = [
+      {
+        id: 0,
+        name: "KICK",
+        code: "BD",
+        color: "#ff4757",
+        steps: 16,
+        hits: 4,
+        rotation: 0,
+        volume: 0.95,
+        mute: false,
+        solo: false,
+        pattern: [],
+        isCustom: false,
+        currentStep: 0,
+        ringOrder: 0 // innermost
+      },
+      {
+        id: 1,
+        name: "SNARE",
+        code: "SD",
+        color: "#ffa502",
+        steps: 16,
+        hits: 2,
+        rotation: 4,
+        volume: 0.85,
+        mute: false,
+        solo: false,
+        pattern: [],
+        isCustom: false,
+        currentStep: 0,
+        ringOrder: 1
+      },
+      {
+        id: 2,
+        name: "CLOSED HAT",
+        code: "CH",
+        color: "#1e90ff",
+        steps: 16,
+        hits: 8,
+        rotation: 0,
+        volume: 0.75,
+        mute: false,
+        solo: false,
+        pattern: [],
+        isCustom: false,
+        currentStep: 0,
+        ringOrder: 3 // high frequency outer
+      },
+      {
+        id: 3,
+        name: "OPEN HAT",
+        code: "OH",
+        color: "#a55eea",
+        steps: 16,
+        hits: 4,
+        rotation: 2,
+        volume: 0.85,
+        decay: 0.35, // Decay / Length in seconds (0.15s to 0.8s)
+        mute: false,
+        solo: false,
+        pattern: [],
+        isCustom: false,
+        currentStep: 0,
+        ringOrder: 4 // outermost
+      },
+      {
+        id: 4,
+        name: "RIMSHOT / PERC",
+        code: "RM",
+        color: "#2ed573",
+        steps: 16,
+        hits: 3,
+        rotation: 6,
+        volume: 0.80,
+        mute: false,
+        solo: false,
+        pattern: [],
+        isCustom: false,
+        currentStep: 0,
+        ringOrder: 2 // mid-frequency
+      }
+    ];
+
+    // --- 4. AUDIO ENGINE & HI-HAT CHOKE GROUP ---
+    let audioCtx = null;
+    let masterGainNode = null;
+    let masterCompressor = null;
+    let masterAnalyser = null;
+    let timeDomainBuffer = null;
+    let frequencyBuffer = null;
+    let trackGainNodes = [];
+    let noiseBuffer = null;
+
+    // Choke Group Reference: Tracks any active ringing Open Hi-Hat
+    let activeOpenHatEnvelope = null;
+
+    // Transport Parameters
+    let isPlaying = false;
+    let tempo = 124;
+    let swing = 0.54; // 50% straight to 70% shuffle
+    let masterVolume = 0.85;
+
+    // Accurate Lookahead Scheduler Timing
+    const LOOKAHEAD_MS = 25;       // Tick frequency (ms)
+    const SCHEDULE_AHEAD_SEC = 0.1; // 100ms lookahead
+    let schedulerTimer = null;
+    let currentGlobalTick = 0;
+    let nextNoteTime = 0.0;
+
+    // Visual synchronization queue
+    const visualQueue = [];
+    const hitRipples = [];
+    let lastRenderedEvent = null;
+    let showPolygons = true;
+
+    // Initialize Web Audio API
+    function initAudio() {
+      if (audioCtx) return;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
+
+      // Master Dynamics Compressor
+      masterCompressor = audioCtx.createDynamicsCompressor();
+      masterCompressor.threshold.setValueAtTime(-6, audioCtx.currentTime);
+      masterCompressor.knee.setValueAtTime(12, audioCtx.currentTime);
+      masterCompressor.ratio.setValueAtTime(6, audioCtx.currentTime);
+      masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+      masterCompressor.release.setValueAtTime(0.14, audioCtx.currentTime);
+
+      // Master Analyser Node for Real-time Radar Oscilloscope & Spectrum
+      masterAnalyser = audioCtx.createAnalyser();
+      masterAnalyser.fftSize = 256;
+      masterAnalyser.smoothingTimeConstant = 0.82;
+      timeDomainBuffer = new Uint8Array(masterAnalyser.fftSize);
+      frequencyBuffer = new Uint8Array(masterAnalyser.frequencyBinCount);
+
+      // Master Gain
+      masterGainNode = audioCtx.createGain();
+      masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+
+      masterGainNode.connect(masterCompressor);
+      masterCompressor.connect(masterAnalyser);
+      masterAnalyser.connect(audioCtx.destination);
+
+      // Pre-render 2 seconds of white noise for zero-latency transient synthesis
+      const bufferSize = audioCtx.sampleRate * 2;
+      noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      // Track individual gain nodes
+      trackGainNodes = VOICES.map(voice => {
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(voice.volume, audioCtx.currentTime);
+        gainNode.connect(masterGainNode);
+        return gainNode;
+      });
+
+      updateUnlockStatus();
+    }
+
+    function checkAudioUnlock() {
+      if (!audioCtx) initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          updateUnlockStatus();
+        });
+      }
+    }
+
+    function updateUnlockStatus() {
+      const banner = document.getElementById('unlockBanner');
+      if (audioCtx && audioCtx.state === 'running') {
+        banner.style.display = 'none';
+      } else {
+        banner.style.display = 'block';
+      }
+    }
+
+    // --- 5. SYNTHESIZER SOUND GENERATORS & CHOKE LOGIC ---
+
+    /**
+     * Hi-Hat Choke Group Logic:
+     * When Closed Hi-Hat fires, cancel scheduled parameter curves on the active Open Hi-Hat
+     * and ramp it down to 0 over a 2–4 ms linear fade to eliminate clicks while cutting off sustain.
+     */
+    function chokeOpenHat(time) {
+      if (activeOpenHatEnvelope) {
+        try {
+          activeOpenHatEnvelope.cancelScheduledValues(time);
+          activeOpenHatEnvelope.setValueAtTime(activeOpenHatEnvelope.value, time);
+          // 3 ms clickless linear fade
+          activeOpenHatEnvelope.linearRampToValueAtTime(0.00001, time + 0.003);
+        } catch (e) {
+          // safe catch if time already passed
+        }
+        activeOpenHatEnvelope = null;
+      }
+    }
+
+    /**
+     * 1. Kick Drum:
+     * Frequency-swept sine wave (pitch drop ~160 Hz -> ~45 Hz over 0.25 s with exponential decay)
+     * Layered with an initial punch click transient.
+     */
+    function synthKick(time, gainNode) {
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const oscGain = audioCtx.createGain();
+      osc.type = 'sine';
+
+      // Pitch sweep: 160Hz -> 45Hz over 0.25s
+      osc.frequency.setValueAtTime(160, time);
+      osc.frequency.exponentialRampToValueAtTime(45, time + 0.25);
+
+      // Amplitude decay over 0.28s
+      oscGain.gain.setValueAtTime(1.0, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+
+      // Click transient
+      const clickOsc = audioCtx.createOscillator();
+      const clickGain = audioCtx.createGain();
+      clickOsc.type = 'triangle';
+      clickOsc.frequency.setValueAtTime(320, time);
+      clickOsc.frequency.exponentialRampToValueAtTime(30, time + 0.025);
+
+      clickGain.gain.setValueAtTime(0.7, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+
+      osc.connect(oscGain);
+      clickOsc.connect(clickGain);
+      oscGain.connect(gainNode);
+      clickGain.connect(gainNode);
+
+      osc.start(time);
+      clickOsc.start(time);
+      osc.stop(time + 0.30);
+      clickOsc.stop(time + 0.03);
+    }
+
+    /**
+     * 2. Snare Drum:
+     * Filtered white noise burst (~1.5 kHz high-pass / band-pass)
+     * layered with an initial 180 Hz tonal transient body.
+     */
+    function synthSnare(time, gainNode) {
+      if (!audioCtx || !noiseBuffer) return;
+
+      // Noise burst component
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer;
+
+      const hpFilter = audioCtx.createBiquadFilter();
+      hpFilter.type = 'highpass';
+      hpFilter.frequency.setValueAtTime(1500, time);
+
+      const bpFilter = audioCtx.createBiquadFilter();
+      bpFilter.type = 'bandpass';
+      bpFilter.frequency.setValueAtTime(2400, time);
+      bpFilter.Q.setValueAtTime(1.4, time);
+
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.9, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+
+      noise.connect(hpFilter);
+      hpFilter.connect(bpFilter);
+      bpFilter.connect(noiseGain);
+      noiseGain.connect(gainNode);
+
+      // Tonal body transient (180 Hz drop)
+      const bodyOsc = audioCtx.createOscillator();
+      const bodyGain = audioCtx.createGain();
+      bodyOsc.type = 'triangle';
+      bodyOsc.frequency.setValueAtTime(180, time);
+      bodyOsc.frequency.exponentialRampToValueAtTime(80, time + 0.08);
+
+      bodyGain.gain.setValueAtTime(0.75, time);
+      bodyGain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+
+      bodyOsc.connect(bodyGain);
+      bodyGain.connect(gainNode);
+
+      noise.start(time);
+      bodyOsc.start(time);
+      noise.stop(time + 0.24);
+      bodyOsc.stop(time + 0.14);
+    }
+
+    /**
+     * 3. Closed Hi-Hat (CH):
+     * Metallic band-pass filtered noise burst with crisp, short exponential decay (~0.04–0.06 s).
+     * Triggers the exclusive Hi-Hat Choke Group to silence any active Open Hi-Hat.
+     */
+    function synthClosedHiHat(time, gainNode) {
+      if (!audioCtx || !noiseBuffer) return;
+
+      // CHOKE OPEN HI-HAT: Immediately cut off ringing Open Hat
+      chokeOpenHat(time);
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer;
+
+      const hpFilter = audioCtx.createBiquadFilter();
+      hpFilter.type = 'highpass';
+      hpFilter.frequency.setValueAtTime(7000, time);
+
+      const bpFilter = audioCtx.createBiquadFilter();
+      bpFilter.type = 'bandpass';
+      bpFilter.frequency.setValueAtTime(9500, time);
+      bpFilter.Q.setValueAtTime(3.5, time);
+
+      const hatGain = audioCtx.createGain();
+      hatGain.gain.setValueAtTime(0.85, time);
+      // Crisp 0.05s decay
+      hatGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+
+      noise.connect(hpFilter);
+      hpFilter.connect(bpFilter);
+      bpFilter.connect(hatGain);
+      hatGain.connect(gainNode);
+
+      // Metallic ring blip
+      const ringOsc = audioCtx.createOscillator();
+      const ringGain = audioCtx.createGain();
+      ringOsc.type = 'square';
+      ringOsc.frequency.setValueAtTime(4200, time);
+
+      ringGain.gain.setValueAtTime(0.12, time);
+      ringGain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
+      ringOsc.connect(ringGain);
+      ringGain.connect(gainNode);
+
+      noise.start(time);
+      ringOsc.start(time);
+      noise.stop(time + 0.06);
+      ringOsc.stop(time + 0.05);
+    }
+
+    /**
+     * 4. Open Hi-Hat (OH):
+     * Long, bright metallic noise burst with adjustable sustain/decay (~0.15–0.8 s)
+     * through a 7 kHz high-pass filter. Shares choke group with Closed Hi-Hat.
+     */
+    function synthOpenHiHat(time, gainNode, decaySeconds = 0.35) {
+      if (!audioCtx || !noiseBuffer) return;
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer;
+
+      const hpFilter = audioCtx.createBiquadFilter();
+      hpFilter.type = 'highpass';
+      hpFilter.frequency.setValueAtTime(7000, time);
+
+      const bpFilter = audioCtx.createBiquadFilter();
+      bpFilter.type = 'bandpass';
+      bpFilter.frequency.setValueAtTime(9000, time);
+      bpFilter.Q.setValueAtTime(2.5, time);
+
+      const hatGain = audioCtx.createGain();
+      hatGain.gain.setValueAtTime(0.85, time);
+      hatGain.gain.exponentialRampToValueAtTime(0.0001, time + decaySeconds);
+
+      noise.connect(hpFilter);
+      hpFilter.connect(bpFilter);
+      bpFilter.connect(hatGain);
+      hatGain.connect(gainNode);
+
+      // Metallic harmonic overtone
+      const ringOsc = audioCtx.createOscillator();
+      const ringGain = audioCtx.createGain();
+      ringOsc.type = 'square';
+      ringOsc.frequency.setValueAtTime(4250, time);
+
+      ringGain.gain.setValueAtTime(0.10, time);
+      ringGain.gain.exponentialRampToValueAtTime(0.0001, time + decaySeconds * 0.8);
+
+      ringOsc.connect(ringGain);
+      ringGain.connect(hatGain);
+
+      // Register active Open Hi-Hat gain node for choke group interruption
+      activeOpenHatEnvelope = hatGain.gain;
+
+      noise.start(time);
+      ringOsc.start(time);
+      noise.stop(time + decaySeconds + 0.05);
+      ringOsc.stop(time + decaySeconds + 0.05);
+    }
+
+    /**
+     * 5. Rimshot / Perc:
+     * Resonant high-Q band-pass burst / ping transient (~1.2–1.6 kHz) with short decay (~0.08 s).
+     */
+    function synthRimshot(time, gainNode) {
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const oscGain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1600, time);
+      osc.frequency.exponentialRampToValueAtTime(600, time + 0.035);
+
+      oscGain.gain.setValueAtTime(0.9, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+      osc.connect(oscGain);
+      oscGain.connect(gainNode);
+
+      if (noiseBuffer) {
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = noiseBuffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, time);
+        filter.Q.setValueAtTime(7.5, time); // resonant high-Q ping
+
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.85, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(gainNode);
+
+        noise.start(time);
+        noise.stop(time + 0.10);
+      }
+
+      osc.start(time);
+      osc.stop(time + 0.09);
+    }
+
+    function triggerInstrument(voiceIndex, time = (audioCtx ? audioCtx.currentTime : 0)) {
+      if (!audioCtx) initAudio();
+      const gainNode = trackGainNodes[voiceIndex];
+      if (!gainNode) return;
+
+      if (voiceIndex === 0) {
+        synthKick(time, gainNode);
+      } else if (voiceIndex === 1) {
+        synthSnare(time, gainNode);
+      } else if (voiceIndex === 2) {
+        synthClosedHiHat(time, gainNode);
+      } else if (voiceIndex === 3) {
+        const decay = VOICES[3].decay || 0.35;
+        synthOpenHiHat(time, gainNode, decay);
+      } else if (voiceIndex === 4) {
+        synthRimshot(time, gainNode);
+      }
+    }
+
+    // --- 6. ACCURATE LOOKAHEAD SCHEDULER ---
+    function scheduler() {
+      while (nextNoteTime < audioCtx.currentTime + SCHEDULE_AHEAD_SEC) {
+        scheduleStep(currentGlobalTick, nextNoteTime);
+        advanceStep();
+      }
+    }
+
+    function advanceStep() {
+      const secondsPerBeat = 60.0 / tempo;
+      const nominalSixteenth = secondsPerBeat / 4.0;
+
+      // Roger Linn / MPC Swing: Even ticks (0, 2, 4...) get lengthened, Odd ticks (1, 3, 5...) shortened
+      const isEven = (currentGlobalTick % 2 === 0);
+      const stepDuration = isEven
+        ? (2.0 * swing * nominalSixteenth)
+        : (2.0 * (1.0 - swing) * nominalSixteenth);
+
+      nextNoteTime += stepDuration;
+      currentGlobalTick++;
+    }
+
+    function scheduleStep(tick, time) {
+      const secondsPerBeat = 60.0 / tempo;
+      const nominalSixteenth = secondsPerBeat / 4.0;
+      const isEven = (tick % 2 === 0);
+      const stepDuration = isEven
+        ? (2.0 * swing * nominalSixteenth)
+        : (2.0 * (1.0 - swing) * nominalSixteenth);
+
+      const hasAnySolo = VOICES.some(v => v.solo);
+      const scheduledHits = [false, false, false, false, false];
+      const stepIndices = [0, 0, 0, 0, 0];
+
+      // If both Closed Hat (voice 2) and Open Hat (voice 3) hit on the same step,
+      // schedule Open Hat first then Closed Hat so CH chokes OH cleanly!
+      const triggerOrder = [0, 1, 3, 2, 4]; // Open Hat processed before Closed Hat
+
+      for (const i of triggerOrder) {
+        const voice = VOICES[i];
+        const stepIdx = tick % voice.steps;
+        stepIndices[i] = stepIdx;
+
+        const isAudible = hasAnySolo ? (voice.solo && !voice.mute) : (!voice.mute);
+
+        if (voice.pattern[stepIdx] === 1) {
+          scheduledHits[i] = true;
+          if (isAudible) {
+            triggerInstrument(i, time);
+          }
+        }
+      }
+
+      // Queue for synchronous 60fps canvas & runner highlighting
+      visualQueue.push({
+        tick: tick,
+        time: time,
+        duration: stepDuration,
+        steps: stepIndices,
+        hits: scheduledHits
+      });
+    }
+
+    function startPlayback() {
+      checkAudioUnlock();
+      if (!audioCtx) return;
+
+      isPlaying = true;
+      document.getElementById('btnPlay').classList.add('playing');
+      document.getElementById('playIcon').textContent = '⏸';
+      document.getElementById('playText').textContent = 'PAUSE';
+
+      nextNoteTime = audioCtx.currentTime + 0.05;
+      schedulerTimer = setInterval(scheduler, LOOKAHEAD_MS);
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      if (schedulerTimer) {
+        clearInterval(schedulerTimer);
+        schedulerTimer = null;
+      }
+      document.getElementById('btnPlay').classList.remove('playing');
+      document.getElementById('playIcon').textContent = '▶';
+      document.getElementById('playText').textContent = 'PLAY';
+    }
+
+    function togglePlayback() {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        startPlayback();
+      }
+    }
+
+    function resetPlayback() {
+      const wasPlaying = isPlaying;
+      stopPlayback();
+      currentGlobalTick = 0;
+      visualQueue.length = 0;
+      lastRenderedEvent = null;
+      for (let i = 0; i < VOICES.length; i++) {
+        VOICES[i].currentStep = 0;
+      }
+      updateUIRealtime();
+      if (wasPlaying) {
+        startPlayback();
+      }
+    }
+
+    // --- 7. CONCENTRIC POLAR CANVAS VISUALIZER ---
+    const polarCanvas = document.getElementById('polarCanvas');
+    const ctx = polarCanvas.getContext('2d');
+
+    // 5 Concentric Rings (Low to High frequency: Kick inside, OH outside)
+    // Radii fractions for: Kick (0.34), Snare (0.48), Rim (0.62), CH (0.76), OH (0.90)
+    const RING_RADII_MAP = {
+      0: 0.34, // Kick (inner)
+      1: 0.48, // Snare
+      4: 0.62, // Rimshot
+      2: 0.76, // Closed Hi-Hat
+      3: 0.90  // Open Hi-Hat (outer)
+    };
+
+    function drawPolarVisualizer() {
+      const w = polarCanvas.width;
+      const h = polarCanvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxRadius = (w / 2) - 32;
+      const now = audioCtx ? audioCtx.currentTime : 0;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Radial background glow
+      const bgGrad = ctx.createRadialGradient(cx, cy, 25, cx, cy, maxRadius + 30);
+      bgGrad.addColorStop(0, '#151924');
+      bgGrad.addColorStop(0.7, '#0e1118');
+      bgGrad.addColorStop(1, '#080a0e');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Subtle 16-division radial guide spokes
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 16; i++) {
+        const angle = -Math.PI / 2 + (i * (2 * Math.PI / 16));
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * (maxRadius * 0.20), cy + Math.sin(angle) * (maxRadius * 0.20));
+        ctx.lineTo(cx + Math.cos(angle) * (maxRadius * 0.96), cy + Math.sin(angle) * (maxRadius * 0.96));
+        ctx.stroke();
+      }
+
+      // Smooth Sweeping Radial Radar Hand (continuous rotation with swing interpolation)
+      let sweepAngle = -Math.PI / 2;
+      let fractionalStep = 0;
+
+      if (audioCtx && isPlaying && lastRenderedEvent) {
+        const elapsed = Math.max(0, now - lastRenderedEvent.time);
+        fractionalStep = Math.min(1.0, elapsed / lastRenderedEvent.duration);
+        const continuous16th = (lastRenderedEvent.tick % 16) + fractionalStep;
+        sweepAngle = -Math.PI / 2 + (continuous16th / 16) * (Math.PI * 2);
+      }
+
+      // Draw Radar Glow Cone trail
+      if (isPlaying) {
+        const trailAngle = sweepAngle - (Math.PI / 6); // 30-degree trailing cone
+        const coneGrad = ctx.createRadialGradient(cx, cy, 15, cx, cy, maxRadius * 0.96);
+        coneGrad.addColorStop(0, 'rgba(30, 144, 255, 0.16)');
+        coneGrad.addColorStop(1, 'rgba(30, 144, 255, 0.0)');
+
+        ctx.fillStyle = coneGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, maxRadius * 0.96, trailAngle, sweepAngle);
+        ctx.closePath();
+        ctx.fill();
+
+        // Sweeping Laser Needle
+        ctx.strokeStyle = '#1e90ff';
+        ctx.shadowColor = '#1e90ff';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(sweepAngle) * (maxRadius * 0.96), cy + Math.sin(sweepAngle) * (maxRadius * 0.96));
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Optional Euclidean Geometric Polygons Overlay
+      if (showPolygons) {
+        for (let v = 0; v < VOICES.length; v++) {
+          const voice = VOICES[v];
+          const radius = maxRadius * RING_RADII_MAP[voice.id];
+          const n = voice.steps;
+          const hitIndices = [];
+          for (let j = 0; j < n; j++) {
+            if (voice.pattern[j] === 1) hitIndices.push(j);
+          }
+
+          if (hitIndices.length >= 2 && !voice.mute) {
+            ctx.beginPath();
+            for (let i = 0; i < hitIndices.length; i++) {
+              const nodeAngle = -Math.PI / 2 + (hitIndices[i] * (2 * Math.PI / n));
+              const px = cx + Math.cos(nodeAngle) * radius;
+              const py = cy + Math.sin(nodeAngle) * radius;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = voice.color + '10';
+            ctx.fill();
+            ctx.strokeStyle = voice.color + '38';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Render 5 Concentric Track Rings & Nodes
+      for (let v = 0; v < VOICES.length; v++) {
+        const voice = VOICES[v];
+        const radius = maxRadius * RING_RADII_MAP[voice.id];
+        const n = voice.steps;
+        const currentActiveStep = voice.currentStep;
+
+        // Orbital Ring Path
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = voice.mute ? '#1c202d' : (voice.color + '2c');
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Moving Polymetric Ring Playhead Marker
+        if (isPlaying && lastRenderedEvent) {
+          const voiceStepContinuous = ((lastRenderedEvent.steps[v] + fractionalStep) / n) * (Math.PI * 2);
+          const pAngle = -Math.PI / 2 + voiceStepContinuous;
+          const px = cx + Math.cos(pAngle) * radius;
+          const py = cy + Math.sin(pAngle) * radius;
+
+          ctx.beginPath();
+          ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = voice.color;
+          ctx.shadowColor = voice.color;
+          ctx.shadowBlur = 8;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        // Dynamically compute node radius so nodes never collide
+        const stepArcLength = (2 * Math.PI * radius) / n;
+        const baseNodeRadius = Math.max(4.5, Math.min(13, stepArcLength * 0.28));
+
+        // Render each step node
+        for (let j = 0; j < n; j++) {
+          const nodeAngle = -Math.PI / 2 + (j * (2 * Math.PI / n));
+          const nx = cx + Math.cos(nodeAngle) * radius;
+          const ny = cy + Math.sin(nodeAngle) * radius;
+
+          const isHit = (voice.pattern[j] === 1);
+          const isCurrent = (j === currentActiveStep);
+
+          if (isHit) {
+            ctx.beginPath();
+            const hitRadius = isCurrent ? (baseNodeRadius * 1.35) : baseNodeRadius;
+            ctx.arc(nx, ny, hitRadius, 0, Math.PI * 2);
+
+            if (isCurrent) {
+              ctx.fillStyle = '#ffffff';
+              ctx.shadowColor = voice.color;
+              ctx.shadowBlur = 18;
+            } else {
+              ctx.fillStyle = voice.mute ? '#475569' : voice.color;
+              ctx.shadowColor = voice.color;
+              ctx.shadowBlur = voice.mute ? 0 : 8;
+            }
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Border ring
+            ctx.beginPath();
+            ctx.arc(nx, ny, hitRadius + 2.5, 0, Math.PI * 2);
+            ctx.strokeStyle = voice.mute ? '#334155' : (voice.color + '88');
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+          } else {
+            // Rest Node
+            ctx.beginPath();
+            const restRadius = isCurrent ? (baseNodeRadius * 0.70) : (baseNodeRadius * 0.40);
+            ctx.arc(nx, ny, restRadius, 0, Math.PI * 2);
+            ctx.fillStyle = isCurrent ? '#ffffff' : '#232938';
+            ctx.fill();
+
+            if (isCurrent) {
+              ctx.beginPath();
+              ctx.arc(nx, ny, baseNodeRadius * 1.1, 0, Math.PI * 2);
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // Render Active Ripple Shockwaves
+      for (let i = hitRipples.length - 1; i >= 0; i--) {
+        const rp = hitRipples[i];
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+        ctx.strokeStyle = rp.color;
+        ctx.globalAlpha = Math.max(0, rp.alpha);
+        ctx.lineWidth = 3.2;
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+
+        rp.r += 2.0;
+        rp.alpha -= 0.055;
+        if (rp.alpha <= 0) {
+          hitRipples.splice(i, 1);
+        }
+      }
+
+      // Center Hub Display with Real-Time Oscilloscope & Spectrum
+      const centerRadius = maxRadius * 0.20;
+
+      let normEnergy = 0;
+      if (masterAnalyser && isPlaying && timeDomainBuffer && frequencyBuffer) {
+        masterAnalyser.getByteTimeDomainData(timeDomainBuffer);
+        masterAnalyser.getByteFrequencyData(frequencyBuffer);
+
+        let sumEnergy = 0;
+        for (let i = 0; i < frequencyBuffer.length; i++) {
+          sumEnergy += frequencyBuffer[i];
+        }
+        normEnergy = (sumEnergy / frequencyBuffer.length) / 255;
+      }
+
+      // 1. Dynamic Radial Audio Glow behind Hub
+      if (isPlaying && normEnergy > 0.02) {
+        const glowRadius = centerRadius + normEnergy * 28;
+        const glowGrad = ctx.createRadialGradient(cx, cy, centerRadius * 0.4, cx, cy, glowRadius);
+        glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0.22)');
+        glowGrad.addColorStop(0.6, 'rgba(46, 213, 115, 0.12)');
+        glowGrad.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = glowGrad;
+        ctx.fill();
+      }
+
+      // 2. Radial Frequency Spectrum Rays around Hub Rim
+      if (isPlaying && masterAnalyser && frequencyBuffer && normEnergy > 0.02) {
+        const numRays = 36;
+        const binStep = Math.floor(frequencyBuffer.length / numRays);
+        for (let b = 0; b < numRays; b++) {
+          const val = frequencyBuffer[b * binStep] / 255;
+          if (val > 0.04) {
+            const rayAngle = (b / numRays) * (Math.PI * 2) - Math.PI / 2;
+            const barLen = val * 18;
+            const r1 = centerRadius + 1.5;
+            const r2 = centerRadius + 1.5 + barLen;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(rayAngle) * r1, cy + Math.sin(rayAngle) * r1);
+            ctx.lineTo(cx + Math.cos(rayAngle) * r2, cy + Math.sin(rayAngle) * r2);
+            ctx.strokeStyle = `hsla(${175 + b * 4}, 100%, 65%, ${Math.min(1, val * 1.3)})`;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 3. Hub Base Disk
+      const hubGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, centerRadius);
+      hubGrad.addColorStop(0, isPlaying && normEnergy > 0.08 ? '#222c3f' : '#1c2230');
+      hubGrad.addColorStop(1, '#10131b');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
+      ctx.fillStyle = hubGrad;
+      ctx.fill();
+      ctx.strokeStyle = isPlaying && normEnergy > 0.08 ? '#00f0ff' : '#283144';
+      ctx.lineWidth = isPlaying && normEnergy > 0.08 ? 2.8 : 2.5;
+      ctx.stroke();
+
+      // 4. Circular Oscilloscope Waveform Ribbon
+      ctx.save();
+      ctx.beginPath();
+      const wavePoints = 128;
+      const waveStep = timeDomainBuffer ? Math.floor(timeDomainBuffer.length / wavePoints) : 1;
+      for (let i = 0; i <= wavePoints; i++) {
+        const idx = (i % wavePoints) * waveStep;
+        const v = (timeDomainBuffer && isPlaying) ? (timeDomainBuffer[idx] - 128) / 128 : 0;
+        const waveOffset = v * (centerRadius * 0.22);
+        const rWave = Math.max(centerRadius * 0.45, (centerRadius * 0.80) + waveOffset);
+        const a = (i / wavePoints) * (Math.PI * 2) - Math.PI / 2;
+        const wx = cx + Math.cos(a) * rWave;
+        const wy = cy + Math.sin(a) * rWave;
+        if (i === 0) ctx.moveTo(wx, wy);
+        else ctx.lineTo(wx, wy);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = isPlaying
+        ? (normEnergy > 0.12 ? '#00f0ff' : 'rgba(30, 144, 255, 0.75)')
+        : 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = isPlaying ? 2.2 : 1.2;
+      if (isPlaying) {
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 8;
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // 5. Readouts (BPM & State)
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // BPM Readout
+      ctx.font = 'bold 42px var(--font-mono), monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`${tempo}`, cx, cy - 12);
+
+      // Status subtitle
+      ctx.font = 'bold 14px var(--font-mono), monospace';
+      ctx.fillStyle = isPlaying ? '#2ed573' : '#64748b';
+      ctx.fillText(isPlaying ? 'PLAYING' : 'STANDBY', cx, cy + 20);
+    }
+
+    function spawnHitRipple(voiceIdx, stepIdx) {
+      const w = polarCanvas.width;
+      const cx = w / 2;
+      const cy = w / 2;
+      const maxRadius = (w / 2) - 32;
+
+      const voice = VOICES[voiceIdx];
+      const radius = maxRadius * RING_RADII_MAP[voice.id];
+      const angle = -Math.PI / 2 + (stepIdx * (2 * Math.PI / voice.steps));
+
+      const nx = cx + Math.cos(angle) * radius;
+      const ny = cy + Math.sin(angle) * radius;
+
+      hitRipples.push({
+        x: nx,
+        y: ny,
+        r: 8,
+        alpha: 1.0,
+        color: voice.color
+      });
+    }
+
+    // Polar Canvas Click Interactions (Center hub toggles play, rings toggle steps)
+    polarCanvas.addEventListener('pointerdown', (e) => {
+      checkAudioUnlock();
+      const rect = polarCanvas.getBoundingClientRect();
+      const scaleX = polarCanvas.width / rect.width;
+      const scaleY = polarCanvas.height / rect.height;
+
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      const cx = polarCanvas.width / 2;
+      const cy = polarCanvas.height / 2;
+      const dx = mx - cx;
+      const dy = my - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxRadius = (polarCanvas.width / 2) - 32;
+
+      // Center Hub Click -> Toggle Play/Pause
+      if (dist <= maxRadius * 0.20) {
+        togglePlayback();
+        return;
+      }
+
+      // Check which voice ring was clicked
+      for (let v = 0; v < VOICES.length; v++) {
+        const ringRadius = maxRadius * RING_RADII_MAP[VOICES[v].id];
+        if (Math.abs(dist - ringRadius) < 28) {
+          const voice = VOICES[v];
+          let angle = Math.atan2(dy, dx) + Math.PI / 2;
+          if (angle < 0) angle += Math.PI * 2;
+
+          const step = Math.round((angle / (Math.PI * 2)) * voice.steps) % voice.steps;
+          toggleStep(v, step);
+          return;
+        }
+      }
+    });
+
+    // --- 8. 5-VOICE SEQUENCER UI & CHANNEL STRIPS ---
+    const voiceStripsContainer = document.getElementById('voiceStripsContainer');
+
+    function buildVoiceStripsUI() {
+      voiceStripsContainer.innerHTML = '';
+
+      VOICES.forEach((voice, index) => {
+        const strip = document.createElement('div');
+        strip.className = `voice-strip active-voice-${index}`;
+        strip.dataset.voice = index;
+        strip.id = `voiceStrip_${index}`;
+
+        const isOH = (index === 3); // Open Hi-Hat
+        const isCH = (index === 2); // Closed Hi-Hat
+
+        strip.innerHTML = `
+          <!-- Header: Name, Audition, Mute/Solo, Formula Badge -->
+          <div class="voice-header">
+            <div class="voice-title-group">
+              <button class="voice-trigger-btn" data-voice="${index}" title="Click to audition sound">
+                <span class="voice-led" id="voiceLed_${index}"></span>
+                <span>${voice.name}</span>
+                <span style="font-size: 0.65rem; color: var(--text-muted);">[${voice.code}]</span>
+              </button>
+              <div class="voice-formula-pill ${voice.isCustom ? 'customized' : ''}" id="formulaPill_${index}">
+                E(${voice.hits}, ${voice.steps}${voice.rotation > 0 ? ', +' + voice.rotation : ''})
+              </div>
+              ${(isCH || isOH) ? `<span class="choke-badge">CHOKE GRP 1</span>` : ''}
+            </div>
+
+            <!-- Mute / Solo -->
+            <div class="voice-strip-buttons">
+              <button class="btn-toggle-round ${voice.mute ? 'active-mute' : ''}" id="muteBtn_${index}" data-action="mute" title="Mute track">M</button>
+              <button class="btn-toggle-round ${voice.solo ? 'active-solo' : ''}" id="soloBtn_${index}" data-action="solo" title="Solo track">S</button>
+            </div>
+          </div>
+
+          <!-- Parameters: Steps (n), Hits (k), Rotation (r), Track Volume, [Decay for OH] -->
+          <div class="voice-params-row">
+            <div class="param-group">
+              <div class="param-label-row">
+                <span>STEPS (n)</span>
+                <span class="p-val" id="valSteps_${index}">${voice.steps}</span>
+              </div>
+              <input type="range" class="param-slider" id="sliderSteps_${index}" min="2" max="32" value="${voice.steps}">
+            </div>
+
+            <div class="param-group">
+              <div class="param-label-row">
+                <span>HITS (k)</span>
+                <span class="p-val" id="valHits_${index}">${voice.hits}</span>
+              </div>
+              <input type="range" class="param-slider" id="sliderHits_${index}" min="0" max="${voice.steps}" value="${voice.hits}">
+            </div>
+
+            <div class="param-group">
+              <div class="param-label-row">
+                <span>ROTATION (r)</span>
+                <span class="p-val" id="valRotation_${index}">${voice.rotation}</span>
+              </div>
+              <input type="range" class="param-slider" id="sliderRotation_${index}" min="0" max="${voice.steps - 1}" value="${voice.rotation}">
+            </div>
+
+            <div class="param-group">
+              <div class="param-label-row">
+                <span>VOL</span>
+                <span class="p-val" id="valVol_${index}">${Math.round(voice.volume * 100)}%</span>
+              </div>
+              <input type="range" class="param-slider" id="sliderVol_${index}" min="0" max="100" value="${Math.round(voice.volume * 100)}">
+            </div>
+
+            ${isOH ? `
+            <div class="param-group" title="Adjust ringing sustain decay time of Open Hi-Hat">
+              <div class="param-label-row">
+                <span style="color: var(--color-oh);">OH DECAY</span>
+                <span class="p-val" id="valDecay_${index}">${(voice.decay || 0.35).toFixed(2)}s</span>
+              </div>
+              <input type="range" class="param-slider" id="sliderDecay_${index}" min="15" max="80" value="${Math.round((voice.decay || 0.35) * 100)}">
+            </div>
+            ` : ''}
+          </div>
+
+          <!-- Linear Step Grid Matrix Row -->
+          <div class="step-grid-wrap">
+            <div class="step-grid-row" id="stepGridRow_${index}">
+              <!-- Dynamic step buttons -->
+            </div>
+          </div>
+
+          <!-- Quick Utilities Row -->
+          <div class="voice-actions-row">
+            <button class="btn-tiny-action" data-action="regen" data-voice="${index}">SYNC E(k,n)</button>
+            <button class="btn-tiny-action" data-action="clear" data-voice="${index}">CLEAR</button>
+            <button class="btn-tiny-action" data-action="invert" data-voice="${index}">INVERT</button>
+            <button class="btn-tiny-action" data-action="shift-l" data-voice="${index}">◀ SHIFT</button>
+            <button class="btn-tiny-action" data-action="shift-r" data-voice="${index}">SHIFT ▶</button>
+          </div>
+        `;
+
+        voiceStripsContainer.appendChild(strip);
+      });
+
+      attachVoiceStripEventListeners();
+      renderAllStepButtons();
+      updateTelemetryDisplay();
+    }
+
+    function renderAllStepButtons() {
+      VOICES.forEach((voice, vIdx) => {
+        renderVoiceStepButtons(vIdx);
+      });
+    }
+
+    function renderVoiceStepButtons(vIdx) {
+      const voice = VOICES[vIdx];
+      const gridRow = document.getElementById(`stepGridRow_${vIdx}`);
+      if (!gridRow) return;
+
+      gridRow.innerHTML = '';
+      for (let s = 0; s < voice.steps; s++) {
+        const btn = document.createElement('button');
+        btn.className = `step-btn ${voice.pattern[s] === 1 ? 'hit' : ''} ${s % 4 === 0 ? 'beat-start' : ''}`;
+        btn.id = `stepBtn_${vIdx}_${s}`;
+        btn.dataset.voice = vIdx;
+        btn.dataset.step = s;
+
+        btn.innerHTML = `
+          <span class="step-num">${s + 1}</span>
+          <span class="step-pip"></span>
+        `;
+
+        btn.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          checkAudioUnlock();
+          toggleStep(vIdx, s);
+        });
+
+        gridRow.appendChild(btn);
+      }
+    }
+
+    function attachVoiceStripEventListeners() {
+      VOICES.forEach((voice, index) => {
+        // Audition trigger button
+        const trigBtn = document.querySelector(`.voice-trigger-btn[data-voice="${index}"]`);
+        trigBtn.addEventListener('pointerdown', () => {
+          checkAudioUnlock();
+          triggerInstrument(index);
+          flashVoiceLed(index);
+        });
+
+        // Steps slider
+        const sliderSteps = document.getElementById(`sliderSteps_${index}`);
+        sliderSteps.addEventListener('input', (e) => {
+          const val = parseInt(e.target.value, 10);
+          voice.steps = val;
+          document.getElementById(`valSteps_${index}`).textContent = val;
+
+          // Clamping hits and rotation
+          const sliderHits = document.getElementById(`sliderHits_${index}`);
+          sliderHits.max = val;
+          if (voice.hits > val) {
+            voice.hits = val;
+            sliderHits.value = val;
+            document.getElementById(`valHits_${index}`).textContent = val;
+          }
+
+          const sliderRot = document.getElementById(`sliderRotation_${index}`);
+          sliderRot.max = val - 1;
+          if (voice.rotation >= val) {
+            voice.rotation = val - 1;
+            sliderRot.value = voice.rotation;
+            document.getElementById(`valRotation_${index}`).textContent = voice.rotation;
+          }
+
+          recalculateVoicePattern(index);
+          renderVoiceStepButtons(index);
+          updateTelemetryDisplay();
+        });
+
+        // Hits slider
+        const sliderHits = document.getElementById(`sliderHits_${index}`);
+        sliderHits.addEventListener('input', (e) => {
+          const val = parseInt(e.target.value, 10);
+          voice.hits = val;
+          document.getElementById(`valHits_${index}`).textContent = val;
+          recalculateVoicePattern(index);
+          renderVoiceStepButtons(index);
+        });
+
+        // Rotation slider
+        const sliderRot = document.getElementById(`sliderRotation_${index}`);
+        sliderRot.addEventListener('input', (e) => {
+          const val = parseInt(e.target.value, 10);
+          voice.rotation = val;
+          document.getElementById(`valRotation_${index}`).textContent = val;
+          recalculateVoicePattern(index);
+          renderVoiceStepButtons(index);
+        });
+
+        // Volume slider
+        const sliderVol = document.getElementById(`sliderVol_${index}`);
+        sliderVol.addEventListener('input', (e) => {
+          const val = parseInt(e.target.value, 10) / 100;
+          voice.volume = val;
+          document.getElementById(`valVol_${index}`).textContent = `${Math.round(val * 100)}%`;
+          if (trackGainNodes[index]) {
+            trackGainNodes[index].gain.setValueAtTime(val, audioCtx ? audioCtx.currentTime : 0);
+          }
+        });
+
+        // Open Hi-Hat Decay Slider (only on Voice 3)
+        if (index === 3) {
+          const sliderDecay = document.getElementById(`sliderDecay_${index}`);
+          if (sliderDecay) {
+            sliderDecay.addEventListener('input', (e) => {
+              const sec = parseInt(e.target.value, 10) / 100;
+              voice.decay = sec;
+              document.getElementById(`valDecay_${index}`).textContent = `${sec.toFixed(2)}s`;
+            });
+          }
+        }
+
+        // Mute button
+        const muteBtn = document.getElementById(`muteBtn_${index}`);
+        muteBtn.addEventListener('click', () => {
+          voice.mute = !voice.mute;
+          muteBtn.classList.toggle('active-mute', voice.mute);
+        });
+
+        // Solo button
+        const soloBtn = document.getElementById(`soloBtn_${index}`);
+        soloBtn.addEventListener('click', () => {
+          voice.solo = !voice.solo;
+          soloBtn.classList.toggle('active-solo', voice.solo);
+        });
+      });
+
+      // Track Action Buttons (Sync, Clear, Invert, Shifts)
+      document.querySelectorAll('.btn-tiny-action').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const action = e.target.dataset.action;
+          const vIdx = parseInt(e.target.dataset.voice, 10);
+          handleVoiceAction(vIdx, action);
+        });
+      });
+    }
+
+    function recalculateVoicePattern(vIdx) {
+      const voice = VOICES[vIdx];
+      voice.pattern = getEuclideanPattern(voice.hits, voice.steps, voice.rotation);
+      voice.isCustom = false;
+      updateVoiceFormulaPill(vIdx);
+    }
+
+    function toggleStep(vIdx, stepIdx) {
+      const voice = VOICES[vIdx];
+      voice.pattern[stepIdx] = voice.pattern[stepIdx] === 1 ? 0 : 1;
+      voice.isCustom = true;
+      voice.hits = voice.pattern.filter(x => x === 1).length;
+
+      document.getElementById(`sliderHits_${vIdx}`).value = voice.hits;
+      document.getElementById(`valHits_${vIdx}`).textContent = voice.hits;
+
+      updateVoiceFormulaPill(vIdx);
+      renderVoiceStepButtons(vIdx);
+
+      if (voice.pattern[stepIdx] === 1) {
+        triggerInstrument(vIdx);
+        spawnHitRipple(vIdx, stepIdx);
+      }
+    }
+
+    function updateVoiceFormulaPill(vIdx) {
+      const voice = VOICES[vIdx];
+      const pill = document.getElementById(`formulaPill_${vIdx}`);
+      if (pill) {
+        pill.textContent = `E(${voice.hits}, ${voice.steps}${voice.rotation > 0 ? ', +' + voice.rotation : ''})${voice.isCustom ? ' *' : ''}`;
+        pill.classList.toggle('customized', voice.isCustom);
+      }
+
+      const legendFormulaMap = {
+        0: 'legendKickFormula',
+        1: 'legendSnareFormula',
+        2: 'legendCHFormula',
+        3: 'legendOHFormula',
+        4: 'legendRimFormula'
+      };
+      const leg = document.getElementById(legendFormulaMap[vIdx]);
+      if (leg) {
+        leg.textContent = `E(${voice.hits},${voice.steps})`;
+      }
+    }
+
+    function handleVoiceAction(vIdx, action) {
+      const voice = VOICES[vIdx];
+      if (action === 'regen') {
+        recalculateVoicePattern(vIdx);
+      } else if (action === 'clear') {
+        voice.pattern = new Array(voice.steps).fill(0);
+        voice.hits = 0;
+        voice.isCustom = true;
+        document.getElementById(`sliderHits_${vIdx}`).value = 0;
+        document.getElementById(`valHits_${vIdx}`).textContent = '0';
+        updateVoiceFormulaPill(vIdx);
+      } else if (action === 'invert') {
+        voice.pattern = voice.pattern.map(p => (p === 1 ? 0 : 1));
+        voice.hits = voice.pattern.filter(x => x === 1).length;
+        voice.isCustom = true;
+        document.getElementById(`sliderHits_${vIdx}`).value = voice.hits;
+        document.getElementById(`valHits_${vIdx}`).textContent = voice.hits;
+        updateVoiceFormulaPill(vIdx);
+      } else if (action === 'shift-l') {
+        voice.rotation = ((voice.rotation - 1 + voice.steps) % voice.steps);
+        document.getElementById(`sliderRotation_${vIdx}`).value = voice.rotation;
+        document.getElementById(`valRotation_${vIdx}`).textContent = voice.rotation;
+        recalculateVoicePattern(vIdx);
+      } else if (action === 'shift-r') {
+        voice.rotation = ((voice.rotation + 1) % voice.steps);
+        document.getElementById(`sliderRotation_${vIdx}`).value = voice.rotation;
+        document.getElementById(`valRotation_${vIdx}`).textContent = voice.rotation;
+        recalculateVoicePattern(vIdx);
+      }
+      renderVoiceStepButtons(vIdx);
+    }
+
+    function flashVoiceLed(vIdx) {
+      const led = document.getElementById(`voiceLed_${vIdx}`);
+      if (led) {
+        led.classList.add('active');
+        setTimeout(() => {
+          led.classList.remove('active');
+        }, 75);
+      }
+    }
+
+    // --- 9. TELEMETRY & SYSTEM RESYNCHRONIZATION (LCM) ---
+    function updateTelemetryDisplay() {
+      const stepLengths = VOICES.map(v => v.steps);
+      const lcmSteps = getMasterLCM(stepLengths);
+
+      // Measures @ 4/4 (16 16th notes per bar)
+      const bars = (lcmSteps / 16).toFixed(1);
+
+      // Duration: 1 step = (15 / BPM) seconds
+      const secondsPer16th = 15.0 / tempo;
+      const totalSeconds = lcmSteps * secondsPer16th;
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = (totalSeconds % 60).toFixed(1);
+      const formattedTime = `${String(mins).padStart(2, '0')}:${String(secs).padStart(4, '0')}`;
+
+      document.getElementById('lcmStepsVal').textContent = `${lcmSteps.toLocaleString()} STEPS`;
+      document.getElementById('lcmMeasuresVal').textContent = `${bars} BARS`;
+      document.getElementById('lcmTimeVal').textContent = formattedTime;
+    }
+
+    // --- 10. PRESETS LOADING ---
+    function loadPreset(presetKey) {
+      const preset = PRESETS[presetKey] || Object.values(PRESETS).find(p => p.name === presetKey);
+      if (!preset) return;
+
+      const trackList = preset.voices || preset.tracks;
+      if (!trackList) return;
+
+      tempo = preset.bpm || 120;
+      document.getElementById('bpmSlider').value = tempo;
+      document.getElementById('bpmVal').textContent = `${tempo} BPM`;
+
+      const presetSwing = preset.swing !== undefined ? preset.swing : 50;
+      swing = presetSwing / 100;
+      document.getElementById('swingSlider').value = presetSwing;
+      document.getElementById('swingVal').textContent = getSwingLabel(presetSwing);
+
+      const defaultVols = [0.95, 0.85, 0.75, 0.85, 0.80];
+
+      for (let i = 0; i < VOICES.length; i++) {
+        const vConfig = trackList[i];
+        if (!vConfig) continue;
+
+        const voice = VOICES[i];
+        voice.steps = vConfig.steps !== undefined ? vConfig.steps : vConfig.n;
+        voice.hits = vConfig.hits !== undefined ? vConfig.hits : vConfig.k;
+        voice.rotation = vConfig.rotation !== undefined ? vConfig.rotation : vConfig.r;
+        voice.volume = vConfig.vol !== undefined ? vConfig.vol : defaultVols[i];
+        if (vConfig.decay !== undefined) {
+          voice.decay = vConfig.decay;
+        }
+
+        voice.mute = false;
+        voice.solo = false;
+        voice.isCustom = false;
+        voice.pattern = getEuclideanPattern(voice.hits, voice.steps, voice.rotation);
+
+        // Update inputs
+        const sliderSteps = document.getElementById(`sliderSteps_${i}`);
+        if (sliderSteps) {
+          sliderSteps.value = voice.steps;
+          document.getElementById(`valSteps_${i}`).textContent = voice.steps;
+        }
+
+        const sliderHits = document.getElementById(`sliderHits_${i}`);
+        if (sliderHits) {
+          sliderHits.max = voice.steps;
+          sliderHits.value = voice.hits;
+          document.getElementById(`valHits_${i}`).textContent = voice.hits;
+        }
+
+        const sliderRot = document.getElementById(`sliderRotation_${i}`);
+        if (sliderRot) {
+          sliderRot.max = voice.steps - 1;
+          sliderRot.value = voice.rotation;
+          document.getElementById(`valRotation_${i}`).textContent = voice.rotation;
+        }
+
+        const sliderVol = document.getElementById(`sliderVol_${i}`);
+        if (sliderVol) {
+          sliderVol.value = Math.round(voice.volume * 100);
+          document.getElementById(`valVol_${i}`).textContent = `${Math.round(voice.volume * 100)}%`;
+        }
+
+        if (i === 3 && voice.decay) {
+          const sliderDecay = document.getElementById(`sliderDecay_${i}`);
+          if (sliderDecay) {
+            sliderDecay.value = Math.round(voice.decay * 100);
+            document.getElementById(`valDecay_${i}`).textContent = `${voice.decay.toFixed(2)}s`;
+          }
+        }
+
+        if (trackGainNodes[i]) {
+          trackGainNodes[i].gain.setValueAtTime(voice.volume, audioCtx ? audioCtx.currentTime : 0);
+        }
+
+        const muteBtn = document.getElementById(`muteBtn_${i}`);
+        if (muteBtn) muteBtn.classList.remove('active-mute');
+        const soloBtn = document.getElementById(`soloBtn_${i}`);
+        if (soloBtn) soloBtn.classList.remove('active-solo');
+
+        updateVoiceFormulaPill(i);
+        renderVoiceStepButtons(i);
+      }
+
+      updateTelemetryDisplay();
+    }
+
+    function getSwingLabel(val) {
+      if (val === 50) return '50% (Straight)';
+      if (val === 66 || val === 67) return `${val}% (Triplet)`;
+      if (val > 50 && val < 60) return `${val}% (Groove)`;
+      return `${val}% (Shuffle)`;
+    }
+
+    // --- 11. 60 FPS RENDER LOOP ---
+    function animationLoop() {
+      const now = audioCtx ? audioCtx.currentTime : 0;
+
+      // Drain visual queue events up to current audio playback time
+      while (visualQueue.length > 0 && visualQueue[0].time <= now) {
+        const ev = visualQueue.shift();
+        lastRenderedEvent = ev;
+
+        for (let i = 0; i < VOICES.length; i++) {
+          VOICES[i].currentStep = ev.steps[i];
+
+          if (ev.hits[i]) {
+            flashVoiceLed(i);
+            spawnHitRipple(i, ev.steps[i]);
+          }
+        }
+
+        updateUIRealtime(ev.tick);
+      }
+
+      drawPolarVisualizer();
+      requestAnimationFrame(animationLoop);
+    }
+
+    function updateUIRealtime(tick = currentGlobalTick) {
+      document.getElementById('globalTickVal').textContent = String(tick).padStart(4, '0');
+
+      const lcmSteps = getMasterLCM(VOICES.map(v => v.steps));
+      const phase = (tick % lcmSteps);
+      const percent = Math.floor((phase / lcmSteps) * 100);
+      document.getElementById('syncProgressBar').style.width = `${percent}%`;
+      document.getElementById('syncPercentVal').textContent = `${percent}%`;
+
+      // Update Linear Step Grid runners
+      for (let v = 0; v < VOICES.length; v++) {
+        const voice = VOICES[v];
+        const stepRow = document.getElementById(`stepGridRow_${v}`);
+        if (!stepRow) continue;
+
+        const currentActive = voice.currentStep;
+        const buttons = stepRow.children;
+        for (let s = 0; s < buttons.length; s++) {
+          if (s === currentActive) {
+            buttons[s].classList.add('current-step');
+          } else {
+            buttons[s].classList.remove('current-step');
+          }
+        }
+      }
+    }
+
+    // --- 12. TAP TEMPO & POLYGON DISPLAY ---
+    let tapTimes = [];
+    document.getElementById('btnTap').addEventListener('click', () => {
+      checkAudioUnlock();
+      const now = performance.now();
+      tapTimes = tapTimes.filter(t => (now - t) < 2500);
+      tapTimes.push(now);
+
+      if (tapTimes.length >= 2) {
+        const intervals = [];
+        for (let i = 1; i < tapTimes.length; i++) {
+          intervals.push(tapTimes[i] - tapTimes[i - 1]);
+        }
+        const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const computedBpm = Math.round(60000 / avg);
+        if (computedBpm >= 60 && computedBpm <= 200) {
+          tempo = computedBpm;
+          document.getElementById('bpmSlider').value = tempo;
+          document.getElementById('bpmVal').textContent = `${tempo} BPM`;
+          updateTelemetryDisplay();
+        }
+      }
+    });
+
+    // Toggle Euclidean Polygons Overlay
+    document.getElementById('btnTogglePolygons').addEventListener('click', () => {
+      showPolygons = !showPolygons;
+      document.getElementById('btnTogglePolygons').textContent = `POLYGONS: ${showPolygons ? 'ON' : 'OFF'}`;
+    });
+
+    // --- 13. TRANSPORT & GLOBAL EVENT LISTENERS ---
+    document.getElementById('btnPlay').addEventListener('click', togglePlayback);
+    document.getElementById('btnReset').addEventListener('click', resetPlayback);
+
+    // Keyboard Spacebar Shortcut
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        togglePlayback();
+      }
+    });
+
+    // Tempo Slider
+    const bpmSlider = document.getElementById('bpmSlider');
+    bpmSlider.addEventListener('input', (e) => {
+      tempo = parseInt(e.target.value, 10);
+      document.getElementById('bpmVal').textContent = `${tempo} BPM`;
+      updateTelemetryDisplay();
+    });
+
+    // Swing Slider
+    const swingSlider = document.getElementById('swingSlider');
+    swingSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      swing = val / 100.0;
+      document.getElementById('swingVal').textContent = getSwingLabel(val);
+    });
+
+    // Master Volume Slider
+    const masterVolSlider = document.getElementById('masterVolSlider');
+    masterVolSlider.addEventListener('input', (e) => {
+      masterVolume = parseInt(e.target.value, 10) / 100.0;
+      document.getElementById('masterVolVal').textContent = `${Math.round(masterVolume * 100)}%`;
+      if (masterGainNode) {
+        masterGainNode.gain.setValueAtTime(masterVolume, audioCtx ? audioCtx.currentTime : 0);
+      }
+    });
+
+    // Presets Dropdown
+    document.getElementById('presetSelect').addEventListener('change', (e) => {
+      loadPreset(e.target.value);
+    });
+
+    // Audio Unlock Handlers
+    document.getElementById('unlockBanner').addEventListener('click', checkAudioUnlock);
+    window.addEventListener('pointerdown', checkAudioUnlock, { once: true });
+
+    // --- 14. APPLICATION INITIALIZATION ---
+    function initializeApp() {
+      // Calculate initial Euclidean distributions
+      VOICES.forEach(voice => {
+        voice.pattern = getEuclideanPattern(voice.hits, voice.steps, voice.rotation);
+      });
+
+      // Build DOM controls & step grid
+      buildVoiceStripsUI();
+
+      // Load Classic House default preset
+      loadPreset('classic-house');
+
+      // Start 60 FPS animation loop
+      requestAnimationFrame(animationLoop);
+    }
+
+    window.addEventListener('DOMContentLoaded', initializeApp);
+  </script>
+</body>
+</html>
